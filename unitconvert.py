@@ -25,10 +25,11 @@ class ParseComment:
         # No operators: -?\d+(.\d+)?(e-?\d+)?
         # Can do math: (-?\d)([^A-Z\s]|\^)*(e([^A-z\s]|\^)+)?
         regex_unit = "[^\d\s]\S*"
+        self.command = self.special_char_replace(comment_text)
         try:
             self.command = re.search(
                 f"{Const.bot_name} +{regex_float} *{regex_unit} +(to|in) +{regex_unit}( +{regex_unit})*",
-                comment_text,
+                self.command,
                 re.IGNORECASE
             ).group(0)
         except AttributeError:
@@ -44,6 +45,20 @@ class ParseComment:
             self.command,
             re.IGNORECASE).group(0).lstrip(f"{s} ").split(" ")
 
+    @staticmethod
+    def special_char_replace(string):
+        special_chars = {
+            "⁰":"^0", "¹":"^1", "²":"^2", "³":"^3", "⁴":"^4", "⁵":"^5", "⁶":"^6", "⁷":"^7",
+            "⁸":"^8", "⁹":"^9",
+            "↉":"0", "⅒":"0.1", "⅑":str(1/9), "⅛":"0.125", "⅐":str(1/7), "⅙":str(1/6),
+            "⅕":"0.2", "¼":"0.25", "⅓":str(1/3), "½":"0.5", "⅖":"0.4", "⅔":str(2/3), "⅜":"0.375",
+            "⅗":"0.6", "¾":"0.75", "⅘":"0.8", "⅝":"0.625", "⅚":str(5/6), "⅞":"0.875",
+            " **":"**", " ^":"**", "**^":"**", "^^":"**", "^":"**"
+        }
+        for old, new in special_chars.items():
+            string = string.replace(old,new)
+        return string
+
     def __str__(self):
         return f"command:{self.command}\nfrom:{self.from_}\nto:{self.to_units}"
 
@@ -57,11 +72,13 @@ class Reply:
         self.debug = debug
         self.comment = comment
         try:
-            parsed_command = ParseComment(self.comment.body)
             if debug:
                 if debug_body is not None:
                     parsed_command = ParseComment(debug_body)
                 print(parsed_command)
+            else:
+                parsed_command = ParseComment(self.comment.body)
+            
         except InvalidSyntaxError:
             self.reply(
                 self.final_text("Sorry I don't understand this. "\
@@ -107,7 +124,7 @@ class Reply:
         # add footer
         strings = list(s for s in strings if s != "")
         strings.append(
-            f"###### *I am a bot* [Find out more]({Const.about_link})")
+            f"###### I am a bot [Find out more]({Const.about_link})")
         return "\n\n---\n\n".join(strings)
 
     @staticmethod
@@ -207,9 +224,12 @@ if __name__ in '__main__':
         client_secret=credentials["client_secret"],
         username=credentials["username"],
         password=credentials["password"],
-        user_agent="u/unit-convert",
+        user_agent=Const.bot_name,
     )
 
     for mention in get_mentions():
-        Reply(mention, ureg, debug=True)
-
+        try:
+            Reply(mention, ureg)
+        except:
+            pass
+        
